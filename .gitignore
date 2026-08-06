@@ -1,0 +1,23 @@
+# Environment & Secrets
+.env
+.env.*
+
+# IDEs & Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Go Binary outputs
+*.exe
+*.exe?
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go-url-shortener   # Your binary name
+
+# OS generated files
+.DS_Store
+Thumbs.db
