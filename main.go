@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"github/RoanYoskyTimane/go-url-shortener/db"
 	"log"
@@ -15,12 +16,19 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+// schemaSQL is applied at startup so a new database is ready before requests
+// are accepted.
+//
+//go:embed sql/schema.sql
+var schemaSQL string
+
 type URLHandler struct {
 	Queries *db.Queries
 	RDB     *redis.Client
 }
 
 func main() {
+	// Load enviroment variables
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found")
 	}
@@ -35,6 +43,7 @@ func main() {
 	dbURL := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
 		dbUser, dbPass, dbHost, dbPort, dbName, dbSSL)
 
+	// Connect to Postgresql Pool
 	ctx := context.Background()
 	dbPool, err := pgxpool.New(ctx, dbURL)
 	if err != nil {
@@ -45,8 +54,12 @@ func main() {
 	if err := dbPool.Ping(ctx); err != nil {
 		log.Fatalf("PostgreSQL ping failed: %v\n", err)
 	}
+	if _, err := dbPool.Exec(ctx, schemaSQL); err != nil {
+		log.Fatalf("Unable to initialize PostgreSQL schema: %v\n", err)
+	}
 	log.Println("Connected to PostgreSQL successfully")
 
+	// Connect to Redis
 	redisAddr := os.Getenv("REDIS_ADDR")
 	redisPassword := os.Getenv("REDIS_PASSWORD")
 
@@ -88,6 +101,5 @@ func main() {
 
 	log.Printf("Server listening on port %s...", port)
 	log.Fatal(http.ListenAndServe(":"+port, r))
-
 
 }
