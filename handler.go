@@ -112,6 +112,56 @@ func (u URLHandler) getShortUrl(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, record.OriginalUrl, http.StatusFound)
 }
 
-func (u URLHandler) updateShortUrl(w http.ResponseWriter, r *http.Request) {}
+func (u URLHandler) updateShortUrl(w http.ResponseWriter, r *http.Request) {
+	shortCode := chi.URLParam(r, "shortCode")
+	if shortCode == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"error":"Not found"}`))
+		return
+	}
+
+	var req UpdateShortUrlRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(`{"error":"Invalid JSON payload"}`))
+		return
+	}
+
+	parsedURL, err := url.ParseRequestURI(req.URL)
+	if err != nil || (parsedURL.Scheme != "http" && parsedURL.Scheme != "https") {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(`{"error":"Invalid URL scheme. Must start with http:// or https://"}`))
+		return
+	}
+
+	ctx := r.Context()
+	record, err := u.Queries.UpdateURL(ctx, db.UpdateURLParams{
+		OriginalUrl: req.URL,
+		ShortCode:   shortCode,
+	})
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"error":"Short URL not found"}`))
+		return
+	}
+
+	_ = u.RDB.Set(ctx, record.ShortCode, record.OriginalUrl, 24*time.Hour).Err()
+
+	resp := ShortURLResponse{
+		ID:        record.ID,
+		URL:       record.OriginalUrl,
+		ShortCode: record.ShortCode,
+		CreatedAt: record.CreatedAt.Time.Format(time.RFC3339),
+		UpdatedAt: record.UpdatedAt.Time.Format(time.RFC3339),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
+}
 func (u URLHandler) deleteShortUrl(w http.ResponseWriter, r *http.Request) {}
 func (u URLHandler) urlStatistics(w http.ResponseWriter, r *http.Request)  {}

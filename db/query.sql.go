@@ -75,3 +75,30 @@ func (q *Queries) IncrementAccessCount(ctx context.Context, shortCode string) er
 	_, err := q.db.Exec(ctx, incrementAccessCount, shortCode)
 	return err
 }
+
+const updateURL = `-- name: UpdateURL :one
+UPDATE urls
+SET original_url = $1,
+    updated_at = NOW()
+WHERE short_code = $2
+RETURNING id, short_code, original_url, access_count, created_at, updated_at
+`
+
+type UpdateURLParams struct {
+	OriginalUrl string
+	ShortCode   string
+}
+
+func (q *Queries) UpdateURL(ctx context.Context, arg UpdateURLParams) (Url, error) {
+	row := q.db.QueryRow(ctx, updateURL, arg.OriginalUrl, arg.ShortCode)
+	var i Url
+	err := row.Scan(
+		&i.ID,
+		&i.ShortCode,
+		&i.OriginalUrl,
+		&i.AccessCount,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
