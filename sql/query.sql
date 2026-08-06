@@ -17,3 +17,10 @@ WHERE short_code = $1;
 -- name: DeleteURLByShortCode :exec
 DELETE FROM urls
 WHERE short_code = $1;
+
+-- name: UpdateURL :one
+UPDATE urls
+SET original_url = $1,
+    updated_at = NOW()
+WHERE short_code = $2
+RETURNING id, short_code, original_url, access_count, created_at, updated_at;
