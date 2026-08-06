@@ -163,5 +163,59 @@ func (u URLHandler) updateShortUrl(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(resp)
 }
-func (u URLHandler) deleteShortUrl(w http.ResponseWriter, r *http.Request) {}
-func (u URLHandler) urlStatistics(w http.ResponseWriter, r *http.Request)  {}
+
+func (u URLHandler) deleteShortUrl(w http.ResponseWriter, r *http.Request) {
+	shortCode := chi.URLParam(r, "shortCode")
+	if shortCode == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"error":"Not found"}`))
+		return
+	}
+
+	ctx := r.Context()
+
+	err := u.Queries.DeleteURLByShortCode(ctx, shortCode)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"error":"Short URL Not found"}`))
+		return
+	}
+	_ = u.RDB.Del(ctx, shortCode).Err()
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (u URLHandler) urlStatistics(w http.ResponseWriter, r *http.Request) {
+	shortCode := chi.URLParam(r, "shortCode")
+	if shortCode == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"error":"Short code parameter required"}`))
+		return
+	}
+
+	ctx := r.Context()
+
+	record, err := u.Queries.GetURLByShortCode(ctx, shortCode)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"error":"Short URL Not found"}`))
+		return
+	}
+
+	resp := URLStatsResponse{
+		ID:          record.ID,
+		URL:         record.OriginalUrl,
+		ShortCode:   record.ShortCode,
+		CreatedAt:   record.CreatedAt.Time.Format(time.RFC3339),
+		UpdatedAt:   record.UpdatedAt.Time.Format(time.RFC3339),
+		AccessCount: record.AccessCount,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
+}
